@@ -2,6 +2,9 @@ use axum::{routing::get, Router};
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod models;
+mod db;
+
 #[tokio::main]
 async fn main() {
     init_tracing();
