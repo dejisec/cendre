@@ -10,7 +10,8 @@ interface ApiResponse {
   expires_at: string;
 }
 
-const DEFAULT_TTL_SECS = 3600;
+const DEFAULT_TTL_SECS =
+  Number(import.meta.env.VITE_DEFAULT_TTL_SECS) || 3600;
 
 export function CreateForm() {
   const [secret, setSecret] = useState("");
@@ -60,7 +61,9 @@ export function CreateForm() {
       }
 
       const json = (await response.json()) as ApiResponse;
-      const baseUrl = window.location.origin || "";
+      const configuredBaseUrl =
+        (import.meta.env.VITE_CENDRE_BASE_URL as string | undefined) || "";
+      const baseUrl = configuredBaseUrl || window.location.origin || "";
       const url = `${baseUrl}/s/${json.id}#${encodedKey}`;
       setResultUrl(url);
     } catch (e) {

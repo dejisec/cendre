@@ -3,6 +3,8 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--save", "", "--appendonly", "no"]
+    volumes:
+      - redis-data:/data
     ports:
       - "6379:6379"
 
@@ -11,11 +13,11 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - RUST_LOG=cendre_backend=info,tower_http=info
+      - BACKEND_BIND_ADDR=0.0.0.0:8080
     depends_on:
       - redis
     ports:
       - "8080:8080"
-    # Note: backend Dockerfile will be added in a later infra step.
 
   frontend:
     build: ./frontend
@@ -23,4 +25,7 @@ services:
       - backend
     ports:
       - "5173:80"
-    # Note: frontend Dockerfile will be added in a later infra step.
+
+volumes:
+  redis-data:
+    driver: local
