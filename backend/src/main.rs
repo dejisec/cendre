@@ -1,9 +1,9 @@
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod models;
 mod db;
+mod models;
 
 #[tokio::main]
 async fn main() {
@@ -22,9 +22,7 @@ async fn main() {
         .await
         .expect("failed to bind TCP listener");
 
-    axum::serve(listener, app)
-        .await
-        .expect("server error");
+    axum::serve(listener, app).await.expect("server error");
 }
 
 fn init_tracing() {
@@ -40,5 +38,3 @@ fn init_tracing() {
 async fn health_check() -> &'static str {
     "ok"
 }
-
-

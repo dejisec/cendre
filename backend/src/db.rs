@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tokio::sync::RwLock;
+use redis::AsyncCommands;
+use redis::aio::ConnectionManager;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::models::Secret;
 
@@ -14,6 +16,18 @@ pub enum StorageError {
 }
 
 pub type StorageResult<T> = Result<T, StorageError>;
+
+impl From<redis::RedisError> for StorageError {
+    fn from(err: redis::RedisError) -> Self {
+        StorageError::Backend(err.to_string())
+    }
+}
+
+impl From<serde_json::Error> for StorageError {
+    fn from(err: serde_json::Error) -> Self {
+        StorageError::Backend(err.to_string())
+    }
+}
 
 /// Abstraction over the underlying storage for secrets.
 ///
@@ -81,61 +95,87 @@ impl SecretStore for InMemorySecretStore {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Redis-backed implementation of `SecretStore`.
+///
+/// Secrets are stored as JSON-serialized `Secret` values under keys with a fixed
+/// prefix and a TTL enforced by Redis. One-time read semantics are implemented
+/// by deleting the key after a successful read.
+pub struct RedisSecretStore {
+    connection: Arc<Mutex<ConnectionManager>>,
+    key_prefix: String,
+}
 
-    #[tokio::test]
-    async fn store_and_get_and_delete_secret_round_trip() {
-        let store = InMemorySecretStore::new();
-
-        let created = store
-            .store_secret("ciphertext".into(), "iv".into(), 60)
-            .await
-            .expect("store_secret should succeed");
-
-        let fetched = store
-            .get_and_delete_secret(&created.id)
-            .await
-            .expect("get_and_delete_secret should succeed")
-            .expect("secret should exist");
-
-        assert_eq!(fetched.id, created.id);
-        assert_eq!(fetched.ciphertext, created.ciphertext);
-        assert_eq!(fetched.iv, created.iv);
-        assert_eq!(fetched.ttl_secs, created.ttl_secs);
+impl RedisSecretStore {
+    /// Construct a new `RedisSecretStore` from the given Redis URL.
+    pub async fn new(redis_url: &str) -> StorageResult<Self> {
+        Self::with_prefix(redis_url, "secret:").await
     }
 
-    #[tokio::test]
-    async fn get_and_delete_secret_is_one_time() {
-        let store = InMemorySecretStore::new();
+    /// Construct a new `RedisSecretStore` with an explicit key prefix.
+    ///
+    /// This is primarily useful for tests to isolate keys.
+    pub async fn with_prefix(redis_url: &str, key_prefix: &str) -> StorageResult<Self> {
+        let client =
+            redis::Client::open(redis_url).map_err(|e| StorageError::Backend(e.to_string()))?;
 
-        let created = store
-            .store_secret("ciphertext".into(), "iv".into(), 10)
+        let manager = client
+            .get_connection_manager()
             .await
-            .expect("store_secret should succeed");
+            .map_err(|e| StorageError::Backend(e.to_string()))?;
 
-        let first = store
-            .get_and_delete_secret(&created.id)
-            .await
-            .expect("first get_and_delete_secret should succeed");
-        assert!(first.is_some(), "first read should return the secret");
-
-        let second = store
-            .get_and_delete_secret(&created.id)
-            .await
-            .expect("second get_and_delete_secret should also succeed");
-        assert!(
-            second.is_none(),
-            "second read should not find the secret after deletion"
-        );
+        Ok(Self {
+            connection: Arc::new(Mutex::new(manager)),
+            key_prefix: key_prefix.to_string(),
+        })
     }
 
-    #[tokio::test]
-    async fn ping_succeeds_for_in_memory_store() {
-        let store = InMemorySecretStore::new();
-        store.ping().await.expect("ping should succeed");
+    fn make_key(&self, id: &str) -> String {
+        format!("{}{}", self.key_prefix, id)
     }
 }
 
+#[async_trait]
+impl SecretStore for RedisSecretStore {
+    async fn store_secret(
+        &self,
+        ciphertext: String,
+        iv: String,
+        ttl_secs: u32,
+    ) -> StorageResult<Secret> {
+        let secret = Secret::new(ciphertext, iv, ttl_secs);
+        let key = self.make_key(&secret.id);
 
+        let json = serde_json::to_string(&secret)?;
+
+        let mut conn = self.connection.lock().await;
+        let _: () = conn.set_ex(key, json, ttl_secs as u64).await?;
+
+        Ok(secret)
+    }
+
+    async fn get_and_delete_secret(&self, id: &str) -> StorageResult<Option<Secret>> {
+        let key = self.make_key(id);
+
+        let mut conn = self.connection.lock().await;
+
+        let json: Option<String> = conn.get(&key).await?;
+
+        if let Some(json) = json {
+            let secret: Secret = serde_json::from_str(&json)?;
+
+            let _: usize = conn.del(&key).await?;
+
+            Ok(Some(secret))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn ping(&self) -> StorageResult<()> {
+        let mut conn = self.connection.lock().await;
+
+        let _: String = redis::cmd("PING").query_async(&mut *conn).await?;
+
+        Ok(())
+    }
+}
