@@ -220,7 +220,6 @@ enum ApiError {
     BadRequest(&'static str),
     NotFound,
     Storage(StorageError),
-    Internal(String),
 }
 
 impl From<StorageError> for ApiError {
@@ -245,10 +244,6 @@ impl axum::response::IntoResponse for ApiError {
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "internal storage error".to_string(),
                 )
-            }
-            ApiError::Internal(msg) => {
-                tracing::error!("internal error: {}", msg);
-                (StatusCode::INTERNAL_SERVER_ERROR, msg)
             }
         };
 
