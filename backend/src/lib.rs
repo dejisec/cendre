@@ -1,12 +1,18 @@
 pub mod db;
 pub mod models;
 
+use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use axum::{
     Json, Router,
+    body::Body,
     extract::{Path, State},
-    http::{HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, Request, StatusCode},
+    middleware::Next,
+    response::IntoResponse,
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
@@ -19,6 +25,51 @@ type SharedSecretStore = Arc<dyn SecretStore>;
 #[derive(Clone)]
 struct AppState {
     store: SharedSecretStore,
+}
+
+#[derive(Clone)]
+struct RateLimiter {
+    max_requests_per_window: u32,
+    window: Duration,
+    buckets: Arc<tokio::sync::Mutex<HashMap<String, RateBucket>>>,
+}
+
+#[derive(Clone, Copy)]
+struct RateBucket {
+    window_start: Instant,
+    count: u32,
+}
+
+impl RateLimiter {
+    fn new(max_requests_per_window: u32, window: Duration) -> Self {
+        Self {
+            max_requests_per_window,
+            window,
+            buckets: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+        }
+    }
+
+    async fn check(&self, identity: &str) -> bool {
+        let mut buckets = self.buckets.lock().await;
+        let now = Instant::now();
+
+        let bucket = buckets.entry(identity.to_string()).or_insert(RateBucket {
+            window_start: now,
+            count: 0,
+        });
+
+        if now.duration_since(bucket.window_start) > self.window {
+            bucket.window_start = now;
+            bucket.count = 0;
+        }
+
+        if bucket.count >= self.max_requests_per_window {
+            return false;
+        }
+
+        bucket.count += 1;
+        true
+    }
 }
 
 /// Build an `axum::Router` instance wired up with an in-memory `SecretStore`.
@@ -42,10 +93,19 @@ pub async fn app_router_from_env() -> Router {
 }
 
 fn app_router_with_state(state: AppState) -> Router {
+    // Allow a modest number of requests per client per minute. This is not meant
+    // to be bulletproof abuse protection, just a first line of defence that can
+    // be tightened or replaced later.
+    let rate_limiter = RateLimiter::new(60, Duration::from_secs(60));
+
     Router::new()
         .route("/health", get(health_check))
         .route("/api/secrets", post(create_secret))
         .route("/api/secret/:id", get(get_secret))
+        .route_layer(axum::middleware::from_fn_with_state(
+            rate_limiter,
+            rate_limit_middleware,
+        ))
         .with_state(state)
 }
 
@@ -121,6 +181,38 @@ fn apply_security_headers(headers: &mut HeaderMap) {
         "Strict-Transport-Security",
         HeaderValue::from_static("max-age=63072000; includeSubDomains; preload"),
     );
+}
+
+fn rate_limit_identity(req: &Request<Body>) -> String {
+    if let Some(addr) = req.extensions().get::<SocketAddr>() {
+        return addr.ip().to_string();
+    }
+
+    "global".to_string()
+}
+
+async fn rate_limit_middleware(
+    State(rate_limiter): State<RateLimiter>,
+    req: Request<Body>,
+    next: Next,
+) -> axum::response::Response {
+    let identity = rate_limit_identity(&req);
+
+    let allowed = rate_limiter.check(&identity).await;
+
+    if !allowed {
+        tracing::warn!(client = %identity, "rate limit exceeded");
+
+        let body = Json(ErrorBody {
+            error: "too many requests".to_string(),
+        });
+        let mut response = body.into_response();
+        *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
+        apply_security_headers(response.headers_mut());
+        response
+    } else {
+        next.run(req).await
+    }
 }
 
 #[derive(Debug)]
@@ -214,6 +306,12 @@ async fn create_secret(
         .store_secret(payload.ciphertext, payload.iv, payload.ttl_secs)
         .await?;
 
+    tracing::info!(
+        secret_id = %secret.id,
+        ttl_secs = secret.ttl_secs,
+        "created secret"
+    );
+
     Ok(ApiResponse(Json(CreateSecretResponse { id: secret.id })))
 }
 
@@ -224,12 +322,19 @@ async fn get_secret(
     let maybe_secret = state.store.get_and_delete_secret(&id).await?;
 
     match maybe_secret {
-        Some(secret) => Ok(ApiResponse(Json(SecretResponse {
-            id: secret.id,
-            ciphertext: secret.ciphertext,
-            iv: secret.iv,
-            ttl_secs: secret.ttl_secs,
-        }))),
-        None => Err(ApiError::NotFound),
+        Some(secret) => {
+            tracing::info!(secret_id = %secret.id, "read secret");
+
+            Ok(ApiResponse(Json(SecretResponse {
+                id: secret.id,
+                ciphertext: secret.ciphertext,
+                iv: secret.iv,
+                ttl_secs: secret.ttl_secs,
+            })))
+        }
+        None => {
+            tracing::info!(secret_id = %id, "secret not found");
+            Err(ApiError::NotFound)
+        }
     }
 }
