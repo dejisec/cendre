@@ -1,38 +1,73 @@
-COMPOSE ?= docker compose
-DC_FILE ?= docker-compose.yml
+SHELL := /bin/bash
 
-.PHONY: help up down logs ps redis-up redis-down backend-integration-test
+DOCKER_COMPOSE ?= docker compose
+DC_FILE        := -f docker-compose.yml
+
+BACKEND_DIR    := backend
+FRONTEND_DIR   := frontend
+
+.PHONY: help run run_detached down logs build \
+	test_backend test_frontend test_e2e test_all \
+	format backend_fmt frontend_lint \
+	_stack_up _stack_up_detached _stack_down
 
 help:
-	@echo "Common commands:"
-	@echo "  make up                        # Start redis (backend/frontend build is not wired yet)"
-	@echo "  make down                      # Stop all services and remove containers"
-	@echo "  make logs                      # Tail logs for all services"
-	@echo "  make ps                        # Show docker-compose service status"
-	@echo "  make redis-up                  # Start only the redis service"
-	@echo "  make redis-down                # Stop only the redis service"
-	@echo "  make backend-integration-test  # Run backend Redis integration tests against docker-compose redis"
+	@echo "Cendre – common workflows"
+	@echo
+	@echo "Dev stack:"
+	@echo "  make run           # start full stack with docker-compose (foreground)"
+	@echo "  make run_detached  # start full stack in background (-d)"
+	@echo "  make down              # stop stack and remove containers"
+	@echo "  make logs              # follow logs for all services"
+	@echo "  make build             # build all docker images"
+	@echo
+	@echo "Tests:"
+	@echo "  make test_backend      # cargo test in backend/"
+	@echo "  make test_frontend     # npm test in frontend/ (unit/component)"
+	@echo "  make test_e2e          # Playwright e2e tests against docker-compose stack"
+	@echo "  make test_all          # backend + frontend + e2e"
+	@echo
+	@echo "Code quality:"
+	@echo "  make format            # cargo fmt + frontend lint"
 
-up: redis-up
+_stack_up:
+	$(DOCKER_COMPOSE) $(DC_FILE) up
 
-down:
-	$(COMPOSE) -f $(DC_FILE) down
+_stack_up_detached:
+	$(DOCKER_COMPOSE) $(DC_FILE) up -d
+
+_stack_down:
+	$(DOCKER_COMPOSE) $(DC_FILE) down
+
+run: _stack_up
+
+run_detached: _stack_up_detached
+
+down: _stack_down
 
 logs:
-	$(COMPOSE) -f $(DC_FILE) logs -f
+	$(DOCKER_COMPOSE) $(DC_FILE) logs -f
 
-ps:
-	$(COMPOSE) -f $(DC_FILE) ps
+build:
+	$(DOCKER_COMPOSE) $(DC_FILE) build
 
-redis-up:
-	$(COMPOSE) -f $(DC_FILE) up -d redis
+test_backend:
+	cd $(BACKEND_DIR) && cargo test
 
-redis-down:
-	$(COMPOSE) -f $(DC_FILE) stop redis
+test_frontend:
+	cd $(FRONTEND_DIR) && npm test
 
-# Run the backend Redis integration tests against the redis instance from docker-compose.
-# This uses the same REDIS_URL as the backend service in docker-compose.yml.
-backend-integration-test: redis-up
-	cd backend && REDIS_URL=redis://localhost:6379 cargo test --test redis_integration
+test_e2e: _stack_up_detached
+	cd $(FRONTEND_DIR) && npm run e2e
+	$(MAKE) _stack_down
 
+test_all: test_backend test_frontend test_e2e
+
+backend_fmt:
+	cd $(BACKEND_DIR) && cargo fmt
+
+frontend_lint:
+	cd $(FRONTEND_DIR) && npm run lint
+
+format: backend_fmt frontend_lint
 
