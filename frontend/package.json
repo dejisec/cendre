@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "react": "^19.2.0",
@@ -24,6 +25,7 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "@playwright/test": "^1.49.0",
     "@tailwindcss/postcss": "^4.1.17",
     "@vitejs/plugin-react-swc": "^4.2.2",
     "autoprefixer": "^10.4.0",
