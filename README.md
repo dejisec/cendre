@@ -2,6 +2,8 @@
 
 Cendre is a zero‑knowledge, burn‑after‑reading secret sharing service.
 
+![Cendre UI Screenshot](cendre-ui.png)
+
 You paste a secret into the UI, Cendre encrypts it **in your browser** using AES‑GCM, ships only ciphertext + IV to the backend, stores it **ephemerally** in Redis, and gives you a one‑time URL. The first person to open that URL (with the `#key` fragment intact) can decrypt the secret exactly once; after that, the secret is gone or expires when its TTL elapses.
 
 - **Client‑side encryption**: Secrets are encrypted via WebCrypto (AES‑GCM 256) in the browser; the backend never sees plaintext or keys.
@@ -35,7 +37,6 @@ Configuration defaults are in `env.example` (you can copy to `.env` in your envi
     - `/s/:id` → `ReadView` (fetch + decrypt once).
   - Handles key generation, AES‑GCM encryption/decryption, base64‑URL safe encoding, and link construction.
 - **Backend (`backend/`)**
-  - Rust 1.85, Axum 0.7.
   - Exposes a small JSON API for storing and retrieving encrypted secrets.
   - Uses a `SecretStore` abstraction with an in‑memory implementation for tests/dev and a Redis‑backed implementation for production.
   - Enforces **one‑time read** semantics and validates TTL bounds.
