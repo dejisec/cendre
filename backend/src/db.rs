@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use redis::AsyncCommands;
 use redis::aio::ConnectionManager;
 use tokio::sync::{Mutex, RwLock};
+use time::OffsetDateTime;
 
 use crate::models::Secret;
 
@@ -86,7 +87,20 @@ impl SecretStore for InMemorySecretStore {
 
     async fn get_and_delete_secret(&self, id: &str) -> StorageResult<Option<Secret>> {
         let mut guard = self.inner.write().await;
-        Ok(guard.remove(id))
+        let maybe_secret = guard.remove(id);
+
+        if let Some(mut secret) = maybe_secret {
+            let now = OffsetDateTime::now_utc();
+
+            if secret.is_expired_at(now) {
+                return Ok(None);
+            }
+
+            secret.mark_read(now);
+            Ok(Some(secret))
+        } else {
+            Ok(None)
+        }
     }
 
     async fn ping(&self) -> StorageResult<()> {
@@ -161,7 +175,8 @@ impl SecretStore for RedisSecretStore {
         let json: Option<String> = conn.get(&key).await?;
 
         if let Some(json) = json {
-            let secret: Secret = serde_json::from_str(&json)?;
+            let mut secret: Secret = serde_json::from_str(&json)?;
+            secret.mark_read(OffsetDateTime::now_utc());
 
             let _: usize = conn.del(&key).await?;
 
@@ -177,5 +192,61 @@ impl SecretStore for RedisSecretStore {
         let _: String = redis::cmd("PING").query_async(&mut *conn).await?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn in_memory_store_respects_ttl_on_read() {
+        let store = InMemorySecretStore::new();
+        let secret = store
+            .store_secret("ciphertext".into(), "iv".into(), 1)
+            .await
+            .expect("store_secret should succeed");
+
+        {
+            let mut guard = store.inner.write().await;
+            let entry = guard
+                .get_mut(&secret.id)
+                .expect("secret should be present in store");
+            entry.created_at = OffsetDateTime::UNIX_EPOCH;
+        }
+
+        let result = store
+            .get_and_delete_secret(&secret.id)
+            .await
+            .expect("get must succeed");
+
+        assert!(
+            result.is_none(),
+            "secret should be treated as expired when TTL elapsed"
+        );
+    }
+
+    #[tokio::test]
+    async fn in_memory_store_returns_secret_once_when_not_expired() {
+        let store = InMemorySecretStore::new();
+        let secret = store
+            .store_secret("ciphertext".into(), "iv".into(), 3600)
+            .await
+            .expect("store_secret should succeed");
+
+        let first = store
+            .get_and_delete_secret(&secret.id)
+            .await
+            .expect("first read must succeed");
+        assert!(first.is_some(), "first read should return the secret");
+
+        let second = store
+            .get_and_delete_secret(&secret.id)
+            .await
+            .expect("second read must succeed");
+        assert!(
+            second.is_none(),
+            "secret should be removed after first successful read"
+        );
     }
 }

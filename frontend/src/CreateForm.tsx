@@ -14,7 +14,6 @@ function sleep(ms: number) {
 
 interface ApiResponse {
   id: string;
-  expires_at: string;
 }
 
 const DEFAULT_TTL_SECS =
