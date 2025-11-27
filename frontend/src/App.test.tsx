@@ -9,7 +9,10 @@ describe("App", () => {
         <App />
       </MemoryRouter>
     );
-    expect(screen.getByText("Cendre")).toBeInTheDocument();
+    // The boot screen shows the main product identity as ASCII art text.
+    expect(
+      screen.getByText(/SECURE ENCRYPTED MESSAGE TRANSMISSION/i)
+    ).toBeInTheDocument();
   });
 });
 

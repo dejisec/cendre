@@ -15,25 +15,27 @@ describe("CreateForm", () => {
     render(<CreateForm />);
 
     expect(
-      screen.getByLabelText(/secret message/i)
+      screen.getByLabelText(/INPUT::SECRET_MESSAGE/i)
     ).toBeInTheDocument();
-    expect(screen.getByLabelText(/time to live/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /create one-time link/i })
+      screen.getByLabelText(/CONFIG::TIME_TO_LIVE/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /ENCRYPT \+ GENERATE LINK/i })
     ).toBeInTheDocument();
   });
 
-  it("shows validation error when secret is empty", async () => {
+  it("keeps the submit button disabled when secret is empty", async () => {
     const user = userEvent.setup();
     render(<CreateForm />);
 
-    await user.click(
-      screen.getByRole("button", { name: /create one-time link/i })
-    );
+    const button = screen.getByRole("button", {
+      name: /ENCRYPT \+ GENERATE LINK/i
+    });
+    await user.click(button);
 
-    expect(
-      screen.getByText(/please enter a secret message/i)
-    ).toBeInTheDocument();
+    // With the new UX the button is simply disabled until there is input.
+    expect(button).toBeDisabled();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -64,19 +66,20 @@ describe("CreateForm", () => {
     render(<CreateForm />);
 
     await user.type(
-      screen.getByLabelText(/secret message/i),
+      screen.getByLabelText(/INPUT::SECRET_MESSAGE/i),
       "hello cendre"
     );
     await user.selectOptions(
-      screen.getByLabelText(/time to live/i),
+      screen.getByLabelText(/CONFIG::TIME_TO_LIVE/i),
       "3600"
     );
 
     await user.click(
-      screen.getByRole("button", { name: /create one-time link/i })
+      screen.getByRole("button", { name: /ENCRYPT \+ GENERATE LINK/i })
     );
 
-    const urlInput = await screen.findByDisplayValue(/\/s\/abc123#/i);
+    const urlInput = await screen.findByLabelText(/Secure URL/i);
+    expect(urlInput).toHaveDisplayValue(/\/s\/abc123#/i);
     expect(urlInput).toBeInTheDocument();
 
     expect(fetchMock).toHaveBeenCalledWith(

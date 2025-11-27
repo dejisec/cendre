@@ -9,10 +9,12 @@ test("full secret flow with one-time read and key staying client-side", async ({
   // Create a new secret via the UI.
   await page.goto("/");
 
-  await page.getByLabel("Secret message").fill(secretText);
-  await page.getByRole("button", { name: "Create one-time link" }).click();
+  await page.getByLabel(/INPUT::SECRET_MESSAGE/i).fill(secretText);
+  await page
+    .getByRole("button", { name: /ENCRYPT \+ GENERATE LINK/i })
+    .click();
 
-  const urlInput = page.getByLabel("One-time secret URL");
+  const urlInput = page.getByLabel("Secure URL");
   await expect(urlInput).toBeVisible();
 
   const fullUrl = await urlInput.inputValue();
@@ -37,7 +39,7 @@ test("full secret flow with one-time read and key staying client-side", async ({
 
   await expect(
     readerPage.getByText(
-      "This secret has been decrypted. It will not be available again."
+      /This message has been permanently deleted from the server/i
     )
   ).toBeVisible();
 
@@ -54,9 +56,7 @@ test("full secret flow with one-time read and key staying client-side", async ({
   await secondPage.goto(fullUrl);
 
   await expect(
-    secondPage.getByText(
-      "This secret has already been read or has expired. It is no longer available."
-    )
+    secondPage.getByText(/Message has been consumed or expired/i)
   ).toBeVisible();
 
   await readerContext.close();

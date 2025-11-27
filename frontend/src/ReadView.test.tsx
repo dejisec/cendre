@@ -31,7 +31,7 @@ describe("ReadView", () => {
     );
 
     expect(
-      screen.getByText(/missing the decryption key fragment/i)
+      screen.getByText(/MISSING_DECRYPTION_KEY/i)
     ).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -63,9 +63,7 @@ describe("ReadView", () => {
       </MemoryRouter>
     );
 
-    expect(
-      await screen.findByText(/hello secret/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/hello secret/i)).toBeInTheDocument();
 
     expect(fetchMock).toHaveBeenCalledWith("/api/secret/abc123");
   });
@@ -88,7 +86,7 @@ describe("ReadView", () => {
     );
 
     expect(
-      await screen.findByText(/already been read or has expired/i)
+      await screen.findByText(/Message has been consumed or expired/i)
     ).toBeInTheDocument();
   });
 });
