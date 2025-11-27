@@ -1,3 +1,5 @@
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
@@ -17,7 +19,8 @@ impl Secret {
     /// Create a new `Secret` with a freshly generated id and current timestamp.
     pub fn new(ciphertext: String, iv: String, ttl_secs: u32) -> Self {
         let created_at = OffsetDateTime::now_utc();
-        let id = Uuid::new_v4().to_string();
+        let uuid = Uuid::new_v4();
+        let id = URL_SAFE_NO_PAD.encode(uuid.as_bytes());
 
         Secret {
             id,
@@ -58,6 +61,17 @@ mod tests {
         let secret = Secret::new(ciphertext.clone(), iv.clone(), ttl_secs);
 
         assert!(!secret.id.is_empty(), "id should be non-empty");
+        assert!(
+            secret.id.len() <= 24,
+            "short ids should be base64url encoded (<=24 chars)"
+        );
+        assert!(
+            secret
+                .id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'),
+            "id must be URL-safe base64 characters"
+        );
         assert_eq!(secret.ciphertext, ciphertext);
         assert_eq!(secret.iv, iv);
         assert_eq!(secret.ttl_secs, ttl_secs);

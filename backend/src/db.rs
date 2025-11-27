@@ -4,8 +4,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use redis::AsyncCommands;
 use redis::aio::ConnectionManager;
-use tokio::sync::{Mutex, RwLock};
 use time::OffsetDateTime;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::models::Secret;
 
