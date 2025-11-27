@@ -4,11 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReadView } from "./ReadView";
 
 vi.mock("./lib/crypto", () => ({
-  importKeyFromBase64Url: vi.fn(),
-  decryptMessage: vi.fn()
+  decryptWithToken: vi.fn()
 }));
 
-import { importKeyFromBase64Url, decryptMessage } from "./lib/crypto";
+import { decryptWithToken } from "./lib/crypto";
 
 describe("ReadView", () => {
   beforeEach(() => {
@@ -48,12 +47,7 @@ describe("ReadView", () => {
     // @ts-expect-error - assigning fetch mock
     global.fetch = fetchMock;
 
-    (importKeyFromBase64Url as unknown as vi.Mock).mockResolvedValue(
-      "key-object"
-    );
-    (decryptMessage as unknown as vi.Mock).mockResolvedValue(
-      "hello secret"
-    );
+    (decryptWithToken as unknown as vi.Mock).mockResolvedValue("hello secret");
 
     render(
       <MemoryRouter initialEntries={["/s/abc123#encoded-key"]}>

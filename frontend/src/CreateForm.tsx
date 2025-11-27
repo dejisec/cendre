@@ -1,9 +1,5 @@
 import { FormEvent, useState, useEffect } from "react";
-import {
-  encryptMessage,
-  exportKeyToBase64Url,
-  generateKey
-} from "./lib/crypto";
+import { encryptWithToken } from "./lib/crypto";
 
 const isTestEnv = import.meta.env.MODE === "test";
 
@@ -60,13 +56,12 @@ export function CreateForm() {
     
     try {
       await sleep(500);
-      addTerminalLine("GENERATING: 256-bit encryption key...");
-      const key = await generateKey();
-      
+      addTerminalLine("GENERATING: 128-bit fragment token...");
       await sleep(300);
-      addTerminalLine("ENCRYPTING: Message with AES-256-GCM...");
-      const { ciphertextB64Url, ivB64Url } = await encryptMessage(secret, key);
-      const encodedKey = await exportKeyToBase64Url(key);
+      addTerminalLine("DERIVING: AES-256 key via HKDF...");
+      const { ciphertextB64Url, ivB64Url, tokenB64Url } = await encryptWithToken(
+        secret
+      );
 
       await sleep(400);
       addTerminalLine("TRANSMITTING: Encrypted payload to secure server...");
@@ -93,7 +88,7 @@ export function CreateForm() {
       const configuredBaseUrl =
         (import.meta.env.VITE_CENDRE_BASE_URL as string | undefined) || "";
       const baseUrl = configuredBaseUrl || window.location.origin || "";
-      const url = `${baseUrl}/s/${json.id}#${encodedKey}`;
+      const url = `${baseUrl}/s/${json.id}#${tokenB64Url}`;
       
       addTerminalLine("SUCCESS: Secure link generated.");
       addTerminalLine(`HASH: ${json.id.substring(0, 8)}...`);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
-import { decryptMessage, importKeyFromBase64Url } from "./lib/crypto";
+import { decryptWithToken } from "./lib/crypto";
 
 const isTestEnv = import.meta.env.MODE === "test";
 
@@ -84,16 +84,12 @@ export function ReadView() {
         
         const json = (await response.json()) as SecretResponse;
         
-        addDecryptionStep("IMPORTING: Decryption key from URL fragment...");
-        await sleep(300);
-        const key = await importKeyFromBase64Url(hash);
-        
-        addDecryptionStep("DECRYPTING: Message with AES-256-GCM...");
+        addDecryptionStep("DERIVING: AES key from fragment token...");
         await sleep(500);
-        const message = await decryptMessage(
+        const message = await decryptWithToken(
           json.ciphertext,
           json.iv,
-          key
+          hash
         );
 
         addDecryptionStep("SUCCESS: Message decrypted successfully.");

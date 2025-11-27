@@ -7,8 +7,7 @@ import * as cryptoLib from "./lib/crypto";
 describe("CreateForm", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    // @ts-expect-error - allow assigning fetch mock in tests
-    global.fetch = vi.fn();
+    globalThis.fetch = vi.fn();
   });
 
   it("renders textarea, ttl selector, and submit button", () => {
@@ -36,21 +35,17 @@ describe("CreateForm", () => {
 
     // With the new UX the button is simply disabled until there is input.
     expect(button).toBeDisabled();
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("encrypts the message, posts to API, and shows a one-time URL", async () => {
     const user = userEvent.setup();
 
-    const mockKey = {} as CryptoKey;
-    vi.spyOn(cryptoLib, "generateKey").mockResolvedValue(mockKey);
-    vi.spyOn(cryptoLib, "encryptMessage").mockResolvedValue({
+    vi.spyOn(cryptoLib, "encryptWithToken").mockResolvedValue({
       ciphertextB64Url: "ciphertext-b64",
-      ivB64Url: "iv-b64"
+      ivB64Url: "iv-b64",
+      tokenB64Url: "token-fragment"
     });
-    vi.spyOn(cryptoLib, "exportKeyToBase64Url").mockResolvedValue(
-      "encoded-key"
-    );
 
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -60,8 +55,7 @@ describe("CreateForm", () => {
         expires_at: "2025-01-01T00:00:00.000Z"
       })
     });
-    // @ts-expect-error - assigning fetch mock
-    global.fetch = fetchMock;
+    globalThis.fetch = fetchMock;
 
     render(<CreateForm />);
 
@@ -79,7 +73,7 @@ describe("CreateForm", () => {
     );
 
     const urlInput = await screen.findByLabelText(/Secure URL/i);
-    expect(urlInput).toHaveDisplayValue(/\/s\/abc123#/i);
+    expect(urlInput).toHaveDisplayValue(/\/s\/abc123#token-fragment/i);
     expect(urlInput).toBeInTheDocument();
 
     expect(fetchMock).toHaveBeenCalledWith(
