@@ -24,9 +24,21 @@ export function ReadView() {
   const [plaintext, setPlaintext] = useState<string | null>(null);
   const [decryptionSteps, setDecryptionSteps] = useState<string[]>([]);
   const [showContent, setShowContent] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const addDecryptionStep = (step: string) => {
     setDecryptionSteps(prev => [...prev, step]);
+  };
+
+  const handleCopy = async () => {
+    if (!plaintext) return;
+    try {
+      await navigator.clipboard.writeText(plaintext);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Swallow clipboard errors; user can still manually select text.
+    }
   };
 
   useEffect(() => {
@@ -124,7 +136,7 @@ export function ReadView() {
             </div>
           </div>
         </div>
-        <div className="text-xs text-terminal-green font-mono">
+        <div className="text-xs text-terminal-green font-mono text-center">
           <div>━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
           <div className="mt-2">STATUS: BLOCKED | REASON: INSUFFICIENT CREDENTIALS</div>
         </div>
@@ -148,7 +160,7 @@ export function ReadView() {
             </div>
           </div>
         </div>
-        <div className="text-xs text-terminal-green font-mono">
+        <div className="text-xs text-terminal-green font-mono text-center">
           <div>━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
           <div className="mt-2">MESSAGE STATUS: DESTROYED | PROTOCOL: ZERO-KNOWLEDGE</div>
         </div>
@@ -224,10 +236,10 @@ export function ReadView() {
             DECRYPTED_CONTENT.TXT
           </div>
           <button
-            onClick={() => navigator.clipboard.writeText(plaintext || "")}
+            onClick={handleCopy}
             className="text-xs text-terminal-green hover:text-terminal-green font-mono px-2 py-1 border border-terminal-green/50 rounded hover:bg-terminal-green/10 transition-all"
           >
-            [COPY]
+            {copied ? "[COPIED]" : "[COPY]"}
           </button>
         </div>
         <div className="bg-black/60 rounded p-4 border border-terminal-green/30">

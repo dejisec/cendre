@@ -1,11 +1,12 @@
 import { Routes, Route } from "react-router-dom";
 import { CreateForm } from "./CreateForm";
 import { ReadView } from "./ReadView";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 function App() {
   const [showBoot, setShowBoot] = useState(true);
   const [bootText, setBootText] = useState("");
+  const currentIndexRef = useRef(0);
 
   const asciiArt = `
 ╔═══════════════════════════════════════════════════════════════╗
@@ -32,12 +33,18 @@ function App() {
 
   useEffect(() => {
     if (showBoot) {
-      let currentIndex = 0;
+      currentIndexRef.current = 0;
+      setBootText(""); // Reset boot text
+      
       const interval = setInterval(() => {
-        if (currentIndex < bootSequence.length) {
-          setBootText(prev => prev + bootSequence[currentIndex] + "\n");
-          currentIndex++;
+        if (currentIndexRef.current < bootSequence.length) {
+          const text = bootSequence[currentIndexRef.current];
+          if (text) {
+            setBootText(prev => prev + text + "\n");
+          }
+          currentIndexRef.current++;
         } else {
+          clearInterval(interval);
           setTimeout(() => setShowBoot(false), 500);
         }
       }, 300);

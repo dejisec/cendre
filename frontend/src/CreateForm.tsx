@@ -125,17 +125,22 @@ export function CreateForm() {
         {/* Terminal Input Section */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label
-              htmlFor="secret"
-              className="text-sm text-terminal-green terminal-text"
-            >
-              <span className="text-terminal-cyan">▸</span> INPUT::SECRET_MESSAGE
-            </label>
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="secret"
+                className="text-sm text-terminal-green terminal-text"
+              >
+                <span className="text-terminal-cyan">▸</span> INPUT::SECRET_MESSAGE
+              </label>
+              <span className="text-xs text-terminal-green">
+                {submitting ? "PROCESSING..." : "READY"}
+              </span>
+            </div>
             <span className="text-xs text-terminal-green">
               CHARS: [{charCount}/∞]
             </span>
           </div>
-          
+
           <div className="relative">
             <textarea
               id="secret"
@@ -143,14 +148,12 @@ export function CreateForm() {
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
               className="w-full rounded bg-black/80 border border-terminal-green/50 px-3 py-3 text-sm text-terminal-green placeholder:text-terminal-green/50 focus:outline-none focus:border-terminal-green focus:shadow-terminal-glow-sm font-mono resize-none terminal-input"
+              style={{ fontSize: "1rem", lineHeight: "1rem" }}
               rows={6}
               placeholder="> Enter classified information here..."
               spellCheck={false}
               disabled={submitting}
             />
-            <div className="absolute top-2 right-2 text-xs text-terminal-green animate-pulse">
-              {submitting ? "PROCESSING..." : "READY"}
-            </div>
           </div>
           
           {error && (
@@ -177,9 +180,9 @@ export function CreateForm() {
               className="w-full rounded bg-black/80 border border-terminal-green/50 px-3 py-2 text-sm text-terminal-green focus:outline-none focus:border-terminal-green focus:shadow-terminal-glow-sm font-mono appearance-none cursor-pointer terminal-input"
               disabled={submitting}
             >
-              <option value={300}>[005] MINUTES</option>
-              <option value={3600}>[060] MINUTES</option>
-              <option value={86400}>[1440] MINUTES</option>
+              <option value={300}>5 minutes</option>
+              <option value={3600}>1 hour</option>
+              <option value={86400}>24 hours</option>
             </select>
           </div>
 
@@ -240,20 +243,20 @@ export function CreateForm() {
             </div>
           </div>
           
-          <div className="relative group">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={copyToClipboard}
+              className="px-3 py-2 bg-terminal-green/20 border border-terminal-green/50 rounded text-xs text-terminal-green hover:bg-terminal-green/30 hover:shadow-terminal-glow-sm transition-all font-mono whitespace-nowrap"
+            >
+              {showCopied ? "COPIED!" : "COPY"}
+            </button>
             <input
               aria-label="Secure URL"
-              className="w-full rounded bg-black/80 border border-terminal-green px-3 py-2 text-xs font-mono text-terminal-green pr-24"
+              className="flex-1 rounded bg-black/80 border border-terminal-green px-3 py-2 text-xs font-mono text-terminal-green"
               value={resultUrl}
               readOnly
               onClick={(e) => e.currentTarget.select()}
             />
-            <button
-              onClick={copyToClipboard}
-              className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-1 bg-terminal-green/20 border border-terminal-green/50 rounded text-xs text-terminal-green hover:bg-terminal-green/30 hover:shadow-terminal-glow-sm transition-all"
-            >
-              {showCopied ? "COPIED!" : "COPY"}
-            </button>
           </div>
           
           <div className="text-xs text-terminal-amber font-mono animate-pulse">
