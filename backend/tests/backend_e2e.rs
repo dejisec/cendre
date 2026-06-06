@@ -18,7 +18,6 @@ async fn create_then_read_secret_end_to_end() {
         "ttl_secs": 60u32,
     });
 
-    // Create a new secret.
     let response = app
         .clone()
         .oneshot(

@@ -18,7 +18,6 @@ module.exports = [
       'e2e/**/*.{ts,tsx}',
       'vite.config.*',
       'playwright.config.*',
-      'tailwind.config.*',
     ],
     languageOptions: {
       parser: tsParser,

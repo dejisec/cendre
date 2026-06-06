@@ -46,9 +46,6 @@ pub trait SecretStore: Send + Sync {
 
     /// Fetch a secret by id and remove it from storage so it can only be read once.
     async fn get_and_delete_secret(&self, id: &str) -> StorageResult<Option<Secret>>;
-
-    /// Lightweight health check for the underlying backend.
-    async fn ping(&self) -> StorageResult<()>;
 }
 
 /// Simple in-memory implementation of `SecretStore` for tests and local development.
@@ -101,11 +98,6 @@ impl SecretStore for InMemorySecretStore {
         } else {
             Ok(None)
         }
-    }
-
-    async fn ping(&self) -> StorageResult<()> {
-        // For the in-memory implementation there is nothing to verify beyond being constructed.
-        Ok(())
     }
 }
 
@@ -184,14 +176,6 @@ impl SecretStore for RedisSecretStore {
         } else {
             Ok(None)
         }
-    }
-
-    async fn ping(&self) -> StorageResult<()> {
-        let mut conn = self.connection.lock().await;
-
-        let _: String = redis::cmd("PING").query_async(&mut *conn).await?;
-
-        Ok(())
     }
 }
 

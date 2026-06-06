@@ -17,9 +17,9 @@ help:
 	@echo "Dev stack:"
 	@echo "  make run           # start full stack with docker-compose (foreground)"
 	@echo "  make run_detached  # start full stack in background (-d)"
-	@echo "  make down              # stop stack and remove containers"
-	@echo "  make logs              # follow logs for all services"
-	@echo "  make build             # build all docker images"
+	@echo "  make down          # stop stack and remove containers"
+	@echo "  make logs          # follow logs for all services"
+	@echo "  make build         # build all docker images"
 	@echo
 	@echo "Tests:"
 	@echo "  make test_backend      # cargo test in backend/"

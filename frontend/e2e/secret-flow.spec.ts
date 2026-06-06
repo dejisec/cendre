@@ -2,19 +2,19 @@ import { test, expect } from "@playwright/test";
 
 test("full secret flow with one-time read and key staying client-side", async ({
   page,
-  browser
+  browser,
 }) => {
   const secretText = "burn-after-reading secret from e2e test";
 
   // Create a new secret via the UI.
   await page.goto("/");
 
-  await page.getByLabel(/INPUT::SECRET_MESSAGE/i).fill(secretText);
+  await page.getByLabel(/secret message/i).fill(secretText);
   await page
-    .getByRole("button", { name: /ENCRYPT \+ GENERATE LINK/i })
+    .getByRole("button", { name: /encrypt \+ create link/i })
     .click();
 
-  const urlInput = page.getByLabel("Secure URL");
+  const urlInput = page.getByLabel("One-time link");
   await expect(urlInput).toBeVisible();
 
   const fullUrl = await urlInput.inputValue();
@@ -36,11 +36,10 @@ test("full secret flow with one-time read and key staying client-side", async ({
   });
 
   await readerPage.goto(fullUrl);
+  await readerPage.getByRole("button", { name: /reveal & burn/i }).click();
 
   await expect(
-    readerPage.getByText(
-      /This message has been permanently deleted from the server/i
-    )
+    readerPage.getByText(/this secret is now gone/i)
   ).toBeVisible();
 
   await expect(
@@ -49,18 +48,17 @@ test("full secret flow with one-time read and key staying client-side", async ({
 
   expect(keySeenInNetwork).toBeFalsy();
 
-  // A second visit should show the "expired / already read" state.
+  // A second visit should show the "gone / already read" state.
   const secondContext = await browser.newContext();
   const secondPage = await secondContext.newPage();
 
   await secondPage.goto(fullUrl);
+  await secondPage.getByRole("button", { name: /reveal & burn/i }).click();
 
   await expect(
-    secondPage.getByText(/Message has been consumed or expired/i)
+    secondPage.getByText(/already been read or has expired/i)
   ).toBeVisible();
 
   await readerContext.close();
   await secondContext.close();
 });
-
-
